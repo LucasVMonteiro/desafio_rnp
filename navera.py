@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import csv
 import os
 import glob
 from io import StringIO
@@ -25,16 +26,23 @@ from skforecast.utils import save_forecaster
 from skforecast.utils import load_forecaster
 
 dire = "Test/"
-
+base_dir = os.getcwd()
 os.chdir(dire)
-
 nomes_jsn = os.listdir(os.getcwd())
+os.chdir(base_dir)
+
+## verifando a existencia do arquivo csv
+if not os.path.exists('submission.csv'):
+    with open('submission.csv', 'w', newline='') as csvfile:
+        colunas = ['id','mean_1','stdev_1','mean_2','stdev_2']
+        writer = csv.writer(csvfile)
+        writer.writerow(colunas)
 
 rates = {}
-counter = 0
 
 for nome in nomes_jsn:
-    with open(nome) as file:
+
+    with open(dire+nome) as file:
 
         data_json = json.load(file)
         data = pd.json_normalize(data_json)
@@ -62,7 +70,7 @@ for nome in nomes_jsn:
             'max_depth': [3, 8, 15, 30, 50, 70]
         }
 
-        results_grid123213 = grid_search_forecaster(
+        results_grid = grid_search_forecaster(
                         forecaster         = forecaster,
                         y                  = pd.Series(data_train),
                         param_grid         = param_grid,
@@ -88,14 +96,6 @@ for nome in nomes_jsn:
         # Predictions
         # ==============================================================================
         predictions = forecaster.predict(steps=steps)
-        # Plot predictions versus test data
-        # ==============================================================================
-        fig, ax = plt.subplots(figsize=(6, 2.5))
-        pd.DataFrame(data_train).plot(ax=ax, label='train')
-        predictions.plot(ax=ax, label='predictions')
-        ax.legend()
-        np.mean(predictions)
-        np.std(predictions)
         data_train2 = pd.concat([pd.Series(data_train), predictions])
         steps = 15
         forecaster = ForecasterAutoreg(
@@ -135,23 +135,14 @@ for nome in nomes_jsn:
                         lags      = 20
                     )
         forecaster.fit(y=data_train2)
-        # Predictions
-        # ==============================================================================
         predictions2 = forecaster.predict(steps=steps)
-        # Plot predictions versus test data
-        # ==============================================================================
-        fig, ax = plt.subplots(figsize=(6, 2.5))
-        pd.DataFrame(data_train).plot(ax=ax, label='train')
-        predictions.plot(ax=ax, label='predictions1')
-        predictions2.plot(ax=ax, label='predictions2')
-        ax.legend()
+
         np.mean(predictions2)
         np.std(predictions2)
         names = ['id','mean_1','stdev_1','mean_2','stdev_2']
         submission = pd.DataFrame(columns=names)
-        row = {'id': '0a0bff1a35379d45f6714b6f9ca95ce','mean_1': np.mean(predictions), 'stdev_1': np.std(predictions), 'mean_2': np.mean(predictions2), 'stdev_2': np.std(predictions2)}
-        submission = submission._append(row, ignore_index = True)
+        row = {'id': nome[:-5],'mean_1': np.mean(predictions), 'stdev_1': np.std(predictions), 'mean_2': np.mean(predictions2), 'stdev_2': np.std(predictions2)}
+        submission = submission._append(row,ignore_index = True)
 
         #submission
-        submission.to_csv('submission.csv', index=False)
-    break
+        submission.to_csv('submission.csv',header=False,mode='a', index=False)
